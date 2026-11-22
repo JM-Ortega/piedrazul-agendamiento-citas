@@ -13,12 +13,17 @@ datasources:
     jsonData:
       timeout: 60
       maxLines: 1000
-      # Id de correlación del backend ([<uuid>]): enlace a todas las líneas que lo contienen,
-      # de cualquier servicio
+      # Id de correlación de la petición HTTP del backend ([<uuid>] tras el hilo): enlace a las
+      # líneas con ese correlation_id EXACTO (metadato estructurado), de cualquier servicio, en
+      # lugar de a cualquier línea que contenga el texto (un aggregateId no es un id de petición).
+      # El tipo label no sirve: Grafana no lee el metadato estructurado. El doble signo de dólar
+      # escapa la expansión de variables de entorno del provisioning: sin escapar, Grafana
+      # sustituía la variable del enlace por vacío al cargar el archivo y el enlace buscaba
+      # correlation_id="" (antes, |= "": todas las líneas).
       derivedFields:
         - name: correlation_id
           matcherType: regex
           matcherRegex: '\[([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\]'
-          url: '{service=~".+"} |= "${__value.raw}"'
+          url: '{service=~".+"} | correlation_id="$${__value.raw}"'
           datasourceUid: loki
           urlDisplayLabel: Ver todas las líneas de esta petición

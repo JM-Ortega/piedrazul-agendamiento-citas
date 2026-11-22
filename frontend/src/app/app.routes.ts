@@ -17,6 +17,7 @@ import { DoctorPatientsComponent } from './features/doctor/doctorPatients/doctor
 import { DoctorMedicalHistoryComponent } from './features/doctor/medicalCheckUp/medicalCheckUp.component';
 import { PatientAppointmentHistoryComponent } from './features/patient/patientAppointmentHistory/patientAppointmentHistory.component';
 import { PatientDashboardComponent } from './features/patient/patientDashboard/patientDashboard.component';
+import { PrivacyPolicyComponent } from './features/legal/privacyPolicy/privacyPolicy.component';
 import { RegisterComponent } from './features/register/register.component';
 import { SchedulerDashboardComponent } from './features/scheduler/pages/schedulerDashboard/schedulerDashboard.component';
 import { SchedulerHistoryComponent } from './features/scheduler/pages/schedulerHistory/schedulerHistory.component';
@@ -24,7 +25,15 @@ import { AuditComponent } from './features/audit/pages/audit/audit.component';
 import { EditProfileComponent } from './features/patient/PatientEditProfile/editProfile.component';
 
 export const routes: Routes = [
-  { path: '', component: HomeComponent },
+  {
+    path: '',
+    component: HomeComponent,
+    data: {
+      helpVideoId: '72Z0reqsPAU',
+      helpVideoAutoOpen: true,
+      helpVideoTitle: 'Video tutorial: ¿cómo crear su cuenta?',
+    },
+  },
 
   {
     path: 'agendador',
@@ -157,6 +166,7 @@ export const routes: Routes = [
     data: { role: 'AUDITOR', helpVideoId: 'u2dHGpCot08' },
   },
   { path: 'registro', component: RegisterComponent },
+  { path: 'politica-tratamiento-datos', component: PrivacyPolicyComponent },
 
   { path: '**', redirectTo: '' },
 ];

@@ -239,7 +239,7 @@ public class PatientController {
 
     /** Reemplaza todos los datos del paciente, incluido el documento. Solo doctores. */
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('DOCTOR')")
+    @PreAuthorize("hasAnyRole('SCHEDULER', 'DOCTOR')")
     @Operation(summary = "Actualizar un paciente",
             description = "Reemplaza todos los datos del paciente, incluido el documento. Solo doctores. El nuevo documento no puede pertenecer a otra persona. El cambio queda registrado en la auditoría.")
     @ApiResponses({

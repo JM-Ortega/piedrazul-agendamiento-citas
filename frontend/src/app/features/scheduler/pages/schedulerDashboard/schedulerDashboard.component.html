@@ -37,6 +37,7 @@
         view="today"
         [results]="results()"
         (cancelRequested)="requestCancelAppointment($event)"
+        (rescheduleRequested)="requestRescheduleAppointment($event)"
       ></app-appointment-table>
     </div>
   </div>

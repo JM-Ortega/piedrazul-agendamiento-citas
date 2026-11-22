@@ -82,7 +82,7 @@ export class DoctorDashboardComponent implements OnInit {
 
   private appointmentsState = new PaginatedState<AppointmentsPatient>();
   pagination = this.appointmentsState.pagination;
-  readonly PAGE_SIZE = 3;
+  readonly PAGE_SIZE = 10;
 
   // ── Signals de UI: modal de confirmación ────────────────────────
 

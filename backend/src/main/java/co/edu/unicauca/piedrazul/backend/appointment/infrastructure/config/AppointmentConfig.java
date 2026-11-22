@@ -129,9 +129,35 @@ public class AppointmentConfig {
     }
 
     @Bean
+    public AppointmentChangeEvents appointmentChangeEvents(
+            ApplicationEventPublisher eventPublisher,
+            PatientConsultPort patientConsultPort,
+            DoctorConfigConsultPort doctorConfigConsultPort) {
+        return new AppointmentChangeEvents(eventPublisher, patientConsultPort, doctorConfigConsultPort);
+    }
+
+    @Bean
     public CancelAppointmentUseCase cancelAppointmentUseCase(
-            AppointmentRepository appointmentRepository) {
-        return new CancelAppointmentUseCaseImpl(appointmentRepository);
+            AppointmentRepository appointmentRepository,
+            AppointmentChangeEvents appointmentChangeEvents) {
+        return new CancelAppointmentUseCaseImpl(appointmentRepository, appointmentChangeEvents);
+    }
+
+    @Bean
+    public RescheduleAppointmentUseCase rescheduleAppointmentUseCase(
+            AppointmentRepository appointmentRepository,
+            CancelAppointmentUseCase cancelAppointmentUseCase,
+            AppointmentSchedulingService appointmentSchedulingService,
+            AutonomousPatientResolutionStrategy autonomousPatientResolutionStrategy,
+            AppointmentChangeEvents appointmentChangeEvents) {
+        // La estrategia "autónoma" solo resuelve el paciente por id (el de la cita original);
+        // el flujo de agendamiento es el manual.
+        return new RescheduleAppointmentUseCaseImpl(
+                appointmentRepository,
+                cancelAppointmentUseCase,
+                appointmentSchedulingService,
+                autonomousPatientResolutionStrategy,
+                appointmentChangeEvents);
     }
 
     @Bean

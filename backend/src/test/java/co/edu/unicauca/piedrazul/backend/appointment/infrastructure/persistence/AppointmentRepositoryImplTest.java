@@ -70,7 +70,7 @@ class AppointmentRepositoryImplTest {
             "idPatient,true", "idPatient,false"
     })
     void listByShouldEndTheSortWithTheUniqueIdAndKeepThePreviousOrder(String sortBy, boolean ascending) {
-        repository.listBy(null, null, null, null, new PageQuery(0, 5, sortBy, ascending));
+        repository.listBy(null, null, null, null, null, new PageQuery(0, 5, sortBy, ascending));
 
         Sort sort = capturedSort();
         Sort.Direction requested = ascending ? Sort.Direction.ASC : Sort.Direction.DESC;
@@ -89,7 +89,7 @@ class AppointmentRepositoryImplTest {
             "idAppointment,true", "idAppointment,false"
     })
     void listByShouldNotRepeatPropertiesWhenSortByIsAlreadyPartOfTheTieBreakers(String sortBy, boolean ascending) {
-        repository.listBy(null, null, null, null, new PageQuery(0, 5, sortBy, ascending));
+        repository.listBy(null, null, null, null, null, new PageQuery(0, 5, sortBy, ascending));
 
         List<Sort.Order> orders = capturedSort().toList();
         assertThat(orders).extracting(Sort.Order::getProperty).doesNotHaveDuplicates();
@@ -107,7 +107,7 @@ class AppointmentRepositoryImplTest {
     void listByShouldNeverRepeatPropertiesForAnyAllowedSortField(boolean ascending) {
         for (String sortBy : List.of("date", "appointmentState", "idDoctor", "idPatient", "startTime", ID)) {
             org.mockito.Mockito.clearInvocations(jpaRepository);
-            repository.listBy(null, null, null, null, new PageQuery(0, 5, sortBy, ascending));
+            repository.listBy(null, null, null, null, null, new PageQuery(0, 5, sortBy, ascending));
 
             assertThat(capturedSort().toList()).extracting(Sort.Order::getProperty)
                     .as("sortBy=%s", sortBy).doesNotHaveDuplicates().contains(ID);

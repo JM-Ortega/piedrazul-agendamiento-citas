@@ -39,7 +39,7 @@ public class NotificationOrchestrator {
         Objects.requireNonNull(now, "La fecha actual es obligatoria");
 
         return notificationRepository
-                .findActiveByAggregateAndType(command.aggregate(), command.type())
+                .findByAggregateAndType(command.aggregate(), command.type())
                 .map(Notification::getId)
                 .orElseGet(() -> createAndScheduleNow(command, now));
     }
@@ -52,7 +52,7 @@ public class NotificationOrchestrator {
         Objects.requireNonNull(now, "La fecha actual es obligatoria");
 
         return notificationRepository
-                .findActiveByAggregateAndType(command.aggregate(), command.type())
+                .findByAggregateAndType(command.aggregate(), command.type())
                 .map(Notification::getId)
                 .orElseGet(() -> createAndScheduleAt(command, now));
     }

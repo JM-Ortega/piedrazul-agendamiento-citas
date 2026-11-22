@@ -232,6 +232,7 @@ export class DoctorAllAppointmentsComponent {
         patientId: patientId || undefined,
         date: date || undefined,
         state: status || undefined,
+        sortDirection: 'desc',
       })
       .subscribe({
         next: (response) => this.appointmentsState.set(response),
@@ -247,12 +248,12 @@ export class DoctorAllAppointmentsComponent {
   private loadTodayAppointments(doctorId: string): void {
     const TODAY_FETCH_SIZE = 200;
     this.doctorService
-      .getAppointmentsByDoctor(doctorId, 0, TODAY_FETCH_SIZE)
+      .getAppointmentsByDoctor(doctorId, 0, TODAY_FETCH_SIZE, {
+        date: this.today,
+      })
       .subscribe({
         next: (response) => {
-          this.todayAppointmentsState.set(
-            response.content.filter((a) => a.date === this.today)
-          );
+          this.todayAppointmentsState.set(response.content);
         },
         error: () => this.todayAppointmentsState.set([]),
       });

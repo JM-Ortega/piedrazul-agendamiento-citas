@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -31,11 +32,14 @@ class CancelAppointmentUseCaseImplTest {
     @Mock
     private AppointmentRepository appointmentRepository;
 
+    @Mock
+    private AppointmentChangeEvents changeEvents;
+
     private CancelAppointmentUseCaseImpl useCase;
 
     @BeforeEach
     void setUp() {
-        useCase = new CancelAppointmentUseCaseImpl(appointmentRepository);
+        useCase = new CancelAppointmentUseCaseImpl(appointmentRepository, changeEvents);
     }
 
     private Appointment buildAppointment(UUID idPatient, LocalDate date) {
@@ -55,6 +59,7 @@ class CancelAppointmentUseCaseImplTest {
 
         assertThat(appointment.getAppointmentState()).isEqualTo(AppointmentState.CANCELADA);
         verify(appointmentRepository).save(appointment);
+        verifyNoInteractions(changeEvents);
     }
 
     @Test
@@ -67,6 +72,20 @@ class CancelAppointmentUseCaseImplTest {
 
         assertThat(appointment.getAppointmentState()).isEqualTo(AppointmentState.CANCELADA);
         verify(appointmentRepository).save(appointment);
+        verify(changeEvents).staffCancelled(appointment);
+    }
+
+    @Test
+    void cancelForRescheduleCancelsWithoutAnyNotice() {
+        UUID appointmentId = UUID.randomUUID();
+        Appointment appointment = buildAppointment(UUID.randomUUID(), LocalDate.now().plusDays(1));
+        when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(appointment);
+
+        useCase.cancelForReschedule(appointmentId);
+
+        assertThat(appointment.getAppointmentState()).isEqualTo(AppointmentState.CANCELADA);
+        verify(appointmentRepository).save(appointment);
+        verifyNoInteractions(changeEvents);
     }
 
     @Test
@@ -79,6 +98,7 @@ class CancelAppointmentUseCaseImplTest {
                 .isInstanceOf(AppointmentAccessDeniedException.class);
 
         verify(appointmentRepository, never()).save(any());
+        verifyNoInteractions(changeEvents);
     }
 
     @Test
@@ -92,5 +112,21 @@ class CancelAppointmentUseCaseImplTest {
                 .isInstanceOf(CancelAppointmentNotAllowedException.class);
 
         verify(appointmentRepository, never()).save(any());
+        verifyNoInteractions(changeEvents);
+    }
+
+    @Test
+    void shouldNotNoticeWhenStaffCancelsAnAppointmentThatIsNotAgendada() {
+        UUID appointmentId = UUID.randomUUID();
+        Appointment appointment = Appointment.reconstruct(
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), SpecialtyCode.FISIOTERAPIA,
+                AppointmentState.CANCELADA, LocalDate.now().plusDays(1), new AppointmentTime(LocalTime.of(9, 0)),
+                SchedulingOrigin.MANUAL);
+        when(appointmentRepository.findByIdForUpdate(appointmentId)).thenReturn(appointment);
+
+        assertThatThrownBy(() -> useCase.cancel(appointmentId, null))
+                .isInstanceOf(co.edu.unicauca.piedrazul.backend.appointment.exception.AppointmentStateConflictException.class);
+
+        verifyNoInteractions(changeEvents);
     }
 }

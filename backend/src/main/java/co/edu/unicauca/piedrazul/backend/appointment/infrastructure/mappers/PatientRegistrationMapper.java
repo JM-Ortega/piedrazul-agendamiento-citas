@@ -32,9 +32,7 @@ public final class PatientRegistrationMapper {
         return switch (source) {
             case MASCULINO -> PatientSex.MASCULINO;
             case FEMENINO -> PatientSex.FEMENINO;
-            case OTRO -> throw new IllegalArgumentException(
-                    "El valor de género OTRO ya no es soportado por el modelo de paciente"
-            );
+            case OTRO -> PatientSex.OTRO;
         };
     }
 }

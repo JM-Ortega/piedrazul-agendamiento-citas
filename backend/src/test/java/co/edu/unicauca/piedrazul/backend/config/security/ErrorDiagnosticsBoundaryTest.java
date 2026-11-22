@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.config.security;
 
+import co.edu.unicauca.piedrazul.backend.appointment.application.AppointmentChangeEvents;
 import co.edu.unicauca.piedrazul.backend.appointment.AppointmentExternalService;
 import co.edu.unicauca.piedrazul.backend.appointment.application.AppointmentSchedulingService;
 import co.edu.unicauca.piedrazul.backend.appointment.application.CancelAppointmentUseCaseImpl;
@@ -19,6 +20,7 @@ import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.GetDoctor
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.IsNewPatientUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.ListAppointmentsUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.RegisterUnscheduledAttentionUseCase;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.RescheduleAppointmentUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.UpdateAppointmentStatusUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.input.UpdateAutonomousSchedulingUseCase;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.AppointmentRepository;
@@ -118,7 +120,7 @@ import static org.mockito.Mockito.when;
         ListAppointmentsUseCase.class, CitaDtoMapper.class, IsNewPatientUseCase.class,
         GetAppointmentStatesUseCase.class, UpdateAutonomousSchedulingUseCase.class,
         GetAutonomousSchedulingContidionUseCase.class, RegisterUnscheduledAttentionUseCase.class,
-        GetDoctorDailyAgendaUseCase.class, CountScheduledAppointmentsUseCase.class,
+        RescheduleAppointmentUseCase.class, GetDoctorDailyAgendaUseCase.class, CountScheduledAppointmentsUseCase.class,
         CheckExistenceByDocAndStateUseCase.class, AppointmentSchedulingService.class,
         ManualPatientResolutionStrategy.class, AutonomousPatientResolutionStrategy.class,
         PatientConsultPort.class, DoctorConfigConsultPort.class, ClinicalHistoryPort.class,
@@ -179,7 +181,7 @@ class ErrorDiagnosticsBoundaryTest {
 
         @Bean
         CancelAppointmentUseCase cancelAppointmentUseCase(AppointmentRepository repository) {
-            return new CancelAppointmentUseCaseImpl(repository);
+            return new CancelAppointmentUseCaseImpl(repository, org.mockito.Mockito.mock(AppointmentChangeEvents.class));
         }
 
         @Bean

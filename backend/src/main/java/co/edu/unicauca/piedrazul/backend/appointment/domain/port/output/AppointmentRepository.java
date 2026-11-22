@@ -74,7 +74,7 @@ public interface AppointmentRepository {
     UUID getPattientIdByAppointmentId(UUID appointmentId);
 
     //Metodo unico para el caso de uso ListAppointmentsUseCase
-    PagedResult<Appointment> listBy(UUID idDoctor, UUID idPatient, LocalDate date, AppointmentState state, PageQuery pageQuery);
+    PagedResult<Appointment> listBy(UUID idDoctor, UUID idPatient, LocalDate date, LocalDate dateTo, AppointmentState state, PageQuery pageQuery);
 
     PagedResult<Appointment> ListDoctorDailyAgenda(UUID idDoctor, LocalDate date, PageQuery pageQuery);
 

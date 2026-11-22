@@ -28,6 +28,10 @@ public class InMemoryNotificationTemplateProvider implements NotificationTemplat
                 appointmentReminderSms(),
                 appointmentReminderEmail(),
                 appointmentReminderWhatsApp(),
+                appointmentCancelledConsole(),
+                appointmentCancelledEmail(),
+                appointmentRescheduledConsole(),
+                appointmentRescheduledEmail(),
                 otpConsole(),
                 otpSms(),
                 otpEmail(),
@@ -147,7 +151,17 @@ public class InMemoryNotificationTemplateProvider implements NotificationTemplat
                 DEFAULT_LOCALE,
                 "appointment-reminder-2-days-email",
                 "Recordatorio de cita médica",
-                "Hola {{patientName}}, recuerda tu cita el {{date}} a las {{time}} con {{doctorName}}.",
+                """
+                Hola {{patientName}}, te recordamos que tienes una cita médica en 2 días.
+
+                Médico: {{doctorName}}
+                Fecha: {{date}}
+                Hora: {{time}}
+
+                Por favor llega con 15 minutos de anticipación y trae tus documentos de identidad.
+
+                Si necesitas cancelar tu cita, puedes hacerlo desde el portal de pacientes, siempre que cumpla las condiciones de cancelación. Para solicitar un cambio de fecha u hora, comunícate con el centro médico.
+                """,
                 loadTemplate("appointment-reminder-2-days-email.html"),
                 null,
                 null
@@ -165,6 +179,90 @@ public class InMemoryNotificationTemplateProvider implements NotificationTemplat
                 null,
                 "appointment_reminder_2_days",
                 List.of("patientName", "doctorName", "date", "time")
+        );
+    }
+
+    // Los avisos de cancelación y reprogramación solo tienen correo y consola. La consola es
+    // diagnóstico genérico: no lleva nombres ni datos de la cita.
+    private TemplateDefinition appointmentCancelledConsole() {
+        return new TemplateDefinition(
+                NotificationType.APPOINTMENT_CANCELLED,
+                NotificationChannel.CONSOLE,
+                DEFAULT_LOCALE,
+                "appointment-cancelled-console",
+                null,
+                "[NOTIFICATION] Aviso de cancelación de cita.",
+                null,
+                null,
+                null
+        );
+    }
+
+    private TemplateDefinition appointmentCancelledEmail() {
+        return new TemplateDefinition(
+                NotificationType.APPOINTMENT_CANCELLED,
+                NotificationChannel.EMAIL,
+                DEFAULT_LOCALE,
+                "appointment-cancelled-email",
+                "Cita médica cancelada",
+                """
+                Hola {{patientName}}, tu cita médica fue cancelada.
+
+                Cita cancelada:
+                Fecha: {{date}}
+                Hora: {{time}}
+                Médico: {{doctorName}}
+                Especialidad: {{specialty}}
+
+                Si deseas programar otra cita, puedes hacerlo desde el portal de pacientes, siempre que el agendamiento en línea esté disponible, o comunicarte con el centro médico.
+                """,
+                loadTemplate("appointment-cancelled-email.html"),
+                null,
+                null
+        );
+    }
+
+    private TemplateDefinition appointmentRescheduledConsole() {
+        return new TemplateDefinition(
+                NotificationType.APPOINTMENT_RESCHEDULED,
+                NotificationChannel.CONSOLE,
+                DEFAULT_LOCALE,
+                "appointment-rescheduled-console",
+                null,
+                "[NOTIFICATION] Aviso de reprogramación de cita.",
+                null,
+                null,
+                null
+        );
+    }
+
+    private TemplateDefinition appointmentRescheduledEmail() {
+        return new TemplateDefinition(
+                NotificationType.APPOINTMENT_RESCHEDULED,
+                NotificationChannel.EMAIL,
+                DEFAULT_LOCALE,
+                "appointment-rescheduled-email",
+                "Tu cita médica fue reprogramada",
+                """
+                Hola {{patientName}}, tu cita médica fue reprogramada. A continuación encontrarás los datos anteriores y los nuevos.
+
+                Antes:
+                Fecha: {{previousDate}}
+                Hora: {{previousTime}}
+                Médico: {{previousDoctorName}}
+                Especialidad: {{previousSpecialty}}
+
+                Ahora:
+                Fecha: {{date}}
+                Hora: {{time}}
+                Médico: {{doctorName}}
+                Especialidad: {{specialty}}
+
+                Si la nueva fecha u hora no te conviene, comunícate con el centro médico para solicitar otro cambio. También puedes cancelar esta cita desde el portal de pacientes y solicitar una nueva, si el agendamiento en línea está disponible. Ten en cuenta que cancelar tu cita no garantiza otro horario.
+                """,
+                loadTemplate("appointment-rescheduled-email.html"),
+                null,
+                null
         );
     }
 
@@ -203,7 +301,13 @@ public class InMemoryNotificationTemplateProvider implements NotificationTemplat
                 DEFAULT_LOCALE,
                 "otp-email",
                 "Código de verificación",
-                "Tu código de verificación es {{code}}. Expira en {{expirationMinutes}} minutos.",
+                """
+                Usa este código para verificar tu identidad.
+
+                Tu código de verificación es {{code}}. Expira en {{expirationMinutes}} minutos.
+
+                Si no solicitaste este código, ignora este mensaje.
+                """,
                 loadTemplate("otp-email.html"),
                 null,
                 null

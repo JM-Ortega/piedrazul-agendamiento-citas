@@ -456,6 +456,56 @@ for variant in /LOGIN /Login /%6cogin; do
   out="$(treq "${variant}" "${AOP[@]}" -H 'Content-Type: application/json' -d "$(jq -cn --arg p "${ADMIN_PW}" '{user:"admin",password:$p}')")"
   check "traefik: variante ${variant} no inicia sesión local ($(http_status "${out}"))" login_refused "${out}"
 done
+# Rutas manipuladas hacia /login (GHSA-cp28-5662-543f). Con parámetros de ruta y puntos, Traefik
+# las resuelve a /login antes de enrutar: 404 de Traefik, sin llegar a Grafana. Las codificadas
+# (%2f, %3b) las reenvía tal cual: el control es Grafana, que no debe iniciar sesión local.
+for variant in /a/..\;x/login /..\;x/login /a/.\;x/../login /a/%2e%2e\;x/login; do
+  out="$(treq "${variant}" "${AOP[@]}" --path-as-is -H 'Content-Type: application/json' -d "$(jq -cn --arg p "${ADMIN_PW}" '{user:"admin",password:$p}')")"
+  check "traefik: ${variant} (normaliza a /login) → 404 de Traefik, sin iniciar sesión" \
+    bash -c "test '$(http_status "${out}")' = 404 && grep -qx '404 page not found' <<< \"\$1\"" _ "${out}"
+done
+# Una variante codificada llega a Grafana: un 302 no prueba nada por sí solo. Se exige que el intento
+# (con la contraseña local correcta) no deje una sesión de administrador utilizable:
+#   1. sin "Logged in" y sin Set-Cookie grafana_session con valor; 2. ninguna cookie en el jar;
+#   3. cualquier cookie obtenida no autentica nada, ni por Traefik sin JWT (401) ni por el loopback
+#      (no es el administrador); 4. el Location de una redirección, seguido por Traefik, tampoco da sesión.
+session_is_admin() { # <jar> → la cookie autentica al administrador local directamente en Grafana (loopback)
+  test "$(curl -s --max-time 10 -b "$1" "${G}/api/user" | jq -r '.login // empty')" = admin
+}
+crafted_login_denied() { # <variante> → 0 si el intento no obtiene ninguna sesión local; deja la evidencia en CRAFTED_NOTE
+  local v="$1" jar="${TMP}/crafted.jar" hdr="${TMP}/crafted.hdr" bod="${TMP}/crafted.body" code loc c
+  rm -f "${jar}" "${hdr}" "${bod}"
+  code="$(curl -sk --max-time 10 --path-as-is "${AOP[@]}" --resolve "${GHOST}:${HTTPS_PORT}:127.0.0.1" -c "${jar}" -D "${hdr}" -o "${bod}" \
+    -w '%{http_code}' -H 'Content-Type: application/json' -d "$(jq -cn --arg p "${ADMIN_PW}" '{user:"admin",password:$p}')" \
+    "https://${GHOST}:${HTTPS_PORT}${v}")" || return 1
+  [[ "${code}" =~ ^[0-9]{3}$ ]] || return 1
+  loc="$(tr -d '\r' < "${hdr}" | sed -n 's/^[Ll]ocation: //p' | head -n1)"
+  CRAFTED_NOTE="HTTP ${code}, Location=${loc:-ninguno}"
+  ! grep -q 'Logged in' "${bod}" || return 1
+  ! grep -qiE '^set-cookie: grafana_session=[^;[:space:]]' "${hdr}" || return 1
+  ! awk '$6 == "grafana_session" && $7 != "" {f=1} END {exit !f}' "${jar}" || return 1
+  # La redirección, si la hay, no puede llevar a una sesión (se sigue una vez, por Traefik)
+  if [[ "${code}" =~ ^3 ]]; then
+    [ -n "${loc}" ] || return 1
+    c="$(curl -sk --max-time 10 --path-as-is "${AOP[@]}" --resolve "${GHOST}:${HTTPS_PORT}:127.0.0.1" -c "${jar}" -o "${bod}" -w '%{http_code}' \
+      "https://${GHOST}:${HTTPS_PORT}${loc#https://${GHOST}:${HTTPS_PORT}}")" || return 1
+    ! grep -q 'Logged in' "${bod}" || return 1
+    ! awk '$6 == "grafana_session" && $7 != "" {f=1} END {exit !f}' "${jar}" || return 1
+    CRAFTED_NOTE="${CRAFTED_NOTE}; al seguirlo: HTTP ${c}"
+  fi
+  # Aunque hubiera una cookie, no debe autenticar: ni sin JWT por Traefik ni directamente en Grafana
+  [ "$(http_status "$(curl -sk --max-time 10 "${AOP[@]}" --resolve "${GHOST}:${HTTPS_PORT}:127.0.0.1" -b "${jar}" -w '\n%{http_code}' "https://${GHOST}:${HTTPS_PORT}/api/user")")" = 401 ] || return 1
+  ! session_is_admin "${jar}"
+}
+# Control positivo: el mismo criterio detecta una sesión de administrador real (login local por el loopback)
+admin_login_ok
+check "control: la cookie del login local legítimo (loopback) autentica al administrador" session_is_admin "${TMP}/admin.jar"
+check "control: sin cookie, el mismo criterio no ve administrador" bash -c "! curl -s --max-time 10 '${G}/api/user' | jq -e '.login == \"admin\"'"
+for variant in '/a/..%2flogin' '/a/..%3bx/login' '/a%2f..%2flogin'; do
+  CRAFTED_NOTE=""
+  crafted_login_denied "${variant}" && r=ok || r=ko
+  check "traefik: variante codificada ${variant} no obtiene sesión local (${CRAFTED_NOTE:-sin respuesta})" test "${r}" = ok
+done
 check "traefik: Basic del administrador local se descarta (401)" \
   test "$(http_status "$(treq /api/user "${AOP[@]}" -u "admin:${ADMIN_PW}")")" = 401
 admin_login_ok

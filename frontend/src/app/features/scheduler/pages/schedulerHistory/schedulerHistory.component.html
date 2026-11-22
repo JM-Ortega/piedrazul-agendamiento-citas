@@ -47,10 +47,20 @@
       <div class="my-3">
         <app-patient-quick-search
           [selectedPatient]="selectedPatient()"
+          [disabled]="isEditingPatient()"
           (patientSelected)="onPatientSelected($event)"
           (cleared)="onClearPatientFilter()"
         ></app-patient-quick-search>
       </div>
+
+      @if (patient(); as p) {
+        <div class="mb-3">
+          <app-patient-info-card
+            [patient]="p"
+            (saved)="onPatientSaved($event)"
+          ></app-patient-info-card>
+        </div>
+      }
 
       <div
         class="flex flex-col md:flex-row md:items-center justify-between mb-2 gap-3"
@@ -91,6 +101,7 @@
         view="all"
         [results]="results()"
         (cancelRequested)="requestCancelAppointment($event)"
+        (rescheduleRequested)="requestRescheduleAppointment($event)"
       ></app-appointment-table>
     </div>
   </div>

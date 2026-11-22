@@ -184,8 +184,8 @@ entrega, y tras una caída o un retraso del procesamiento puede despacharse desp
 cita sigue elegible. `AppointmentScheduledEvent` se conserva para el recordatorio y la auditoría. Una
 cita no se reprograma sobre sí misma: se cancela y se crea otra, con su propio recordatorio.
 
-La cancelación de la cita no escribe en notificaciones: el despachador es el único que decide el
-resultado, y consulta el estado confirmado a través de `appointment::eligibility`
+La cancelación de la cita no modifica el recordatorio ya encolado: el despachador es el único que decide
+su resultado, y consulta el estado confirmado a través de `appointment::eligibility`
 (`AppointmentEligibility.isScheduled`), una lectura fuera de toda transacción que no espera a
 cancelaciones en curso. El recordatorio solo se entrega mientras la cita exista y siga `AGENDADA`.
 Primero se resuelve cualquier intento que pudo llegar al proveedor; después se lee la cita antes de
@@ -214,6 +214,36 @@ intento nuevo; en la lectura final el intento `PROCESSING` ya está confirmado y
 tampoco se puede escribir el cierre (`FAILED`, o `CANCELLED` si la cita ya no era elegible), el intento
 sigue en `PROCESSING` para la recuperación, que no puede distinguir este caso y lo cierra como
 `UNKNOWN` aunque el proveedor no se invocara. Sobrestima la incertidumbre, pero no reenvía.
+
+**Avisos de cancelación y reagendamiento.** Dos tipos adicionales, `APPOINTMENT_CANCELLED` y
+`APPOINTMENT_RESCHEDULED`, avisan al paciente por correo (con la consola solo como diagnóstico, que
+nunca cuenta como entrega; no hay SMS ni WhatsApp):
+
+| Operación | Aviso |
+|---|---|
+| El paciente cancela su propia cita (`cancel` con `patientId`) | ninguno |
+| El personal cancela (`cancel` con `patientId` nulo) | uno de cancelación |
+| Reagendamiento exitoso (agendador o médico) | uno de reagendamiento, con "Antes" y "Ahora"; ninguno de cancelación |
+| Cualquiera de las operaciones falla o se revierte | ninguno |
+
+El reagendamiento cancela la original con `cancelForReschedule`, que no publica nada, y publica
+`AppointmentRescheduledEvent` como último paso. La cancelación del personal publica
+`AppointmentCancelledByStaffEvent`. Ambos son eventos de Spring Modulith: se registran dentro de la
+transacción, se consumen tras el commit y se descartan con el rollback. Un fallo al encolar o entregar
+el aviso no afecta a la operación ya confirmada. Los avisos se asocian a la cita original (la
+cancelada), por lo que su clave de idempotencia (agregado + tipo) no choca con la del recordatorio de la
+cita nueva, que sigue programándose igual. Si faltan los datos del paciente o el nombre de un médico, el
+aviso se omite con una advertencia (sin datos personales) y la operación continúa. No se exige que la cita
+siga `AGENDADA`, y su contenido es identificable: en consola solo se muestra con el diagnóstico sintético
+explícito y nunca con un proveedor real, y la plantilla de consola es genérica.
+
+`sendNow` y `schedule` buscan una notificación existente del mismo agregado y tipo en cualquier estado,
+terminal incluido, porque la clave de idempotencia es única sin importar el estado: un evento
+reentregado tras `FAILED`, `CANCELLED` o `EXPIRED` no vuelve a insertar. Si dos procesos compiten por la
+misma clave, uno falla por la restricción única y su evento se resuelve en la reentrega. `alreadySent`
+conserva su significado (solo estados activos o de éxito). Los valores nuevos del catálogo llegan por el
+seed repetible; un backend anterior no reconoce estos tipos, por lo que ante un retroceso conviene
+corregir hacia adelante.
 
 **Confirmaciones históricas.** El tipo `APPOINTMENT_SCHEDULED` ya no se genera; su valor de catálogo y
 sus plantillas se conservan para leer las filas existentes. Una confirmación que siga en cola se

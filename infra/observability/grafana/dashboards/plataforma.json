@@ -1007,7 +1007,7 @@
     {
       "type": "timeseries",
       "title": "Proporción de respuestas 5xx por servicio",
-      "description": "Fracción de respuestas 5xx por servicio en ventanas de 5 m: exactamente lo que evalúa PiedrazulHttp5xxRatioHigh. Línea roja punteada: umbral de la alerta (5 %), que además exige > 0,02 req/s de ese mismo total durante 10 m. Sin tráfico no hay línea; 0 significa tráfico sin 5xx. Incluye los 502 de un upstream que no responde. En grafana sus 501 (APIs de la interfaz no implementadas en esta instalación) no cuentan ni como 5xx ni en el total; se ven en Respuestas por código.",
+      "description": "Fracción de respuestas 5xx por servicio en ventanas de 5 m: exactamente lo que evalúa PiedrazulHttp5xxRatioHigh. Línea roja punteada: umbral de la alerta (5 %), que además exige > 0,02 req/s de ese mismo total durante 10 m. Sin tráfico no hay línea; 0 significa tráfico sin 5xx. El eje llega al menos a 10 % para ver el umbral y se amplía solo si la proporción real es mayor. Incluye los 502 de un upstream que no responde. En grafana sus 501 (APIs de la interfaz no implementadas en esta instalación) no cuentan ni como 5xx ni en el total; se ven en Respuestas por código.",
       "targets": [
         {
           "datasource": {
@@ -1030,6 +1030,7 @@
             "fillOpacity": 10,
             "showPoints": "never",
             "spanNulls": false,
+            "axisSoftMax": 0.1,
             "stacking": {
               "mode": "none"
             },
@@ -1078,7 +1079,14 @@
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
-      }
+      },
+      "links": [
+        {
+          "title": "Logs de Traefik",
+          "url": "/d/piedrazul-logs?var-service=traefik&${__url_time_range}",
+          "targetBlank": false
+        }
+      ]
     },
     {
       "type": "timeseries",
@@ -1137,12 +1145,19 @@
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
-      }
+      },
+      "links": [
+        {
+          "title": "Logs de Traefik",
+          "url": "/d/piedrazul-logs?var-service=traefik&${__url_time_range}",
+          "targetBlank": false
+        }
+      ]
     },
     {
       "type": "timeseries",
       "title": "Respuestas por código (websecure)",
-      "description": "Todas las respuestas del entrypoint público HTTPS, apiladas por código. Color por clase: 2xx verde, 3xx azul, 4xx amarillo (errores del cliente: sin sesión, credenciales rechazadas, rutas inexistentes; por sí solos no son incidentes), 5xx rojo. En gris: 0 (conexión actualizada a WebSocket, sin código final) y 501 (aquí los genera la interfaz de Grafana con APIs no implementadas; un 501 de otro servicio sí cuenta en Proporción de respuestas 5xx). 499: el cliente cerró la petición antes de la respuesta.",
+      "description": "Todas las respuestas del entrypoint público HTTPS, una línea por código. Color por clase: 2xx verde, 3xx azul, 4xx amarillo (errores del cliente: sin sesión, credenciales rechazadas, rutas inexistentes; por sí solos no son incidentes), 5xx rojo. En gris: 0 (conexión actualizada a WebSocket, sin código final) y 501 (aquí los genera la interfaz de Grafana con APIs no implementadas; un 501 de otro servicio sí cuenta en Proporción de respuestas 5xx). 499: el cliente cerró la petición antes de la respuesta.",
       "targets": [
         {
           "datasource": {
@@ -1166,7 +1181,7 @@
             "showPoints": "never",
             "spanNulls": false,
             "stacking": {
-              "mode": "normal"
+              "mode": "none"
             }
           },
           "color": {
@@ -1363,15 +1378,15 @@
     },
     {
       "type": "timeseries",
-      "title": "Backend: peticiones por estado",
-      "description": "Peticiones por segundo atendidas por Spring en el backend, apiladas por código de estado (mismos colores que Respuestas por código). Incluye las de monitoreo a /actuator, como el healthcheck de Docker en /actuator/health cada 30 s: con poco tráfico real, buena parte de lo que se ve es ese tráfico. Detalle por ruta en el dashboard Backend.",
+      "title": "Backend: peticiones de la API por estado",
+      "description": "Peticiones por segundo atendidas por Spring en el backend, una línea por código de estado (mismos colores que Respuestas por código), sin /actuator: así el healthcheck de Docker (cada 30 s) no domina con poco tráfico real. El tráfico de monitoreo a /actuator, con sus estados (un 503 en /actuator/health), está en el dashboard Backend (Monitoreo: peticiones a /actuator). Detalle por ruta, también en Backend.",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (status) (rate(http_server_requests_seconds_count{job=\"backend\"}[$__rate_interval]))",
+          "expr": "sum by (status) (rate(http_server_requests_seconds_count{job=\"backend\", uri!~\"/actuator.*\"}[$__rate_interval]))",
           "legendFormat": "{{status}}",
           "refId": "A",
           "range": true,
@@ -1388,7 +1403,7 @@
             "showPoints": "never",
             "spanNulls": false,
             "stacking": {
-              "mode": "normal"
+              "mode": "none"
             }
           },
           "color": {
@@ -1494,7 +1509,19 @@
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
-      }
+      },
+      "links": [
+        {
+          "title": "Detalle por ruta (Backend)",
+          "url": "/d/piedrazul-backend-jvm?${__url_time_range}",
+          "targetBlank": false
+        },
+        {
+          "title": "Logs del backend",
+          "url": "/d/piedrazul-logs?var-service=backend&${__url_time_range}",
+          "targetBlank": false
+        }
+      ]
     },
     {
       "type": "timeseries",
@@ -1553,12 +1580,19 @@
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
-      }
+      },
+      "links": [
+        {
+          "title": "Detalle por ruta (Backend)",
+          "url": "/d/piedrazul-backend-jvm?${__url_time_range}",
+          "targetBlank": false
+        }
+      ]
     },
     {
       "type": "timeseries",
       "title": "Keycloak: peticiones por resultado",
-      "description": "Peticiones por segundo atendidas por Keycloak (sin las de métricas y health), apiladas por resultado: SUCCESS (2xx), REDIRECTION (3xx, normales en el flujo de inicio de sesión), CLIENT_ERROR (4xx: incluye credenciales rechazadas y sesiones vencidas; no son por sí incidentes) y SERVER_ERROR (5xx, en rojo).",
+      "description": "Peticiones por segundo atendidas por Keycloak (sin las de métricas y health), una línea por resultado: SUCCESS (2xx), REDIRECTION (3xx, normales en el flujo de inicio de sesión), CLIENT_ERROR (4xx: incluye credenciales rechazadas y sesiones vencidas; no son por sí incidentes) y SERVER_ERROR (5xx, en rojo).",
       "targets": [
         {
           "datasource": {
@@ -1582,7 +1616,7 @@
             "showPoints": "never",
             "spanNulls": false,
             "stacking": {
-              "mode": "normal"
+              "mode": "none"
             }
           },
           "color": {
@@ -1688,7 +1722,14 @@
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
-      }
+      },
+      "links": [
+        {
+          "title": "Logs de Keycloak",
+          "url": "/d/piedrazul-logs?var-service=keycloak&${__url_time_range}",
+          "targetBlank": false
+        }
+      ]
     },
     {
       "type": "timeseries",
@@ -2268,7 +2309,7 @@
     {
       "type": "timeseries",
       "title": "E/S de disco",
-      "description": "Bytes por segundo leídos y escritos por dispositivo.",
+      "description": "Bytes por segundo leídos y escritos por dispositivo de bloque, tal como los reporta Alloy; los nombres dependen del host. Incluye dispositivos virtuales (loopN, ramN) porque el patrón device_exclude de config.alloy («loop», «ram» sin número) no los alcanza; en el laboratorio local (WSL2) aparecían así, y no se ha comprobado en otros hosts. No se filtran aquí: una lectura en un loopN puede ser actividad real de un archivo montado (que además se cuenta en el dispositivo que lo contiene). Para el almacenamiento real, identificar el dispositivo de cada punto de montaje en el host (por ejemplo con lsblk) antes de interpretar la lectura.",
       "targets": [
         {
           "datasource": {

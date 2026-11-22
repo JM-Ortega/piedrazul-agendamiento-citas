@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.backend.notifications.application;
 
+import co.edu.unicauca.piedrazul.backend.appointment.application.AppointmentChangeEvents;
 import co.edu.unicauca.piedrazul.backend.appointment.application.AppointmentEligibilityService;
 import co.edu.unicauca.piedrazul.backend.appointment.application.CancelAppointmentUseCaseImpl;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Appointment;
@@ -115,7 +116,8 @@ class AppointmentReminderEligibilityIT extends PostgresIntegrationSupport {
 
         @Bean
         CancelAppointmentUseCase cancelAppointmentUseCase(AppointmentRepository appointmentRepository) {
-            return new CancelAppointmentUseCaseImpl(appointmentRepository);
+            return new CancelAppointmentUseCaseImpl(appointmentRepository,
+                    org.mockito.Mockito.mock(AppointmentChangeEvents.class));
         }
     }
 

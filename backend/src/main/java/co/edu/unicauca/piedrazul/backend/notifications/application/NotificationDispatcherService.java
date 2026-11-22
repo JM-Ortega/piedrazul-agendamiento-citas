@@ -240,7 +240,8 @@ public class NotificationDispatcherService {
                             finishWithoutAcceptance(fallbackAvailable), now),
                     attempt,
                     prepared.rejection().code(),
-                    triedChannels
+                    triedChannels,
+                    true
             );
         }
 
@@ -351,31 +352,72 @@ public class NotificationDispatcherService {
                         finishWithoutAcceptance(fallbackAvailable), null, now),
                 attempt,
                 outcome.errorCode(),
-                triedChannels
+                triedChannels,
+                false
         );
     }
 
-    /** No aceptación probada: se pasa al siguiente canal elegible o se cierra como FAILED. */
+    /**
+     * No aceptación probada: se pasa al siguiente canal elegible o se cierra como FAILED.
+     *
+     * @param localRejection el intento falló antes de invocar al proveedor: no se atribuye a él en
+     *        los logs (el intento persistido conserva su nombre, que no se modifica aquí).
+     */
     private Step afterNonAcceptance(
             Run run,
             DispatchWrite write,
             NotificationAttempt attempt,
             String reason,
-            List<NotificationChannel> triedChannels
+            List<NotificationChannel> triedChannels,
+            boolean localRejection
     ) {
         if (!write(run, write)) {
             return Step.DONE;
         }
 
-        NotificationLogger.attemptFailed(run.context(attempt), attempt.getFailureType(), reason);
+        run.failures.add(new ChannelFailure(attempt.getChannel(), reason, localRejection));
+
+        NotificationLogContext attemptContext = localRejection
+                ? run.localContext(attempt)
+                : run.context(attempt);
+
+        NotificationLogger.attemptFailed(attemptContext, attempt.getFailureType(), reason, !localRejection);
 
         if (write.finish() == DispatchFinish.FAILED) {
-            NotificationLogger.failed(run.context(), triedChannels, reason);
+            NotificationLogger.failed(run.context(), triedChannels, lastDeliveryError(run.failures, reason),
+                    describeFailures(run.failures));
             return Step.DONE;
         }
 
-        NotificationLogger.fallback(run.context(attempt), attempt.getChannel(), null, reason);
+        NotificationLogger.fallback(attemptContext, attempt.getChannel(), null, reason);
         return Step.NEXT_CHANNEL;
+    }
+
+    /**
+     * Causa por canal de este despacho, para que el cierre no oculte un rechazo local anterior
+     * tras el último error (p. ej. el diagnóstico de consola). Solo códigos: sin destinatario.
+     */
+    private static List<String> describeFailures(List<ChannelFailure> failures) {
+        return failures.stream()
+                .map(failure -> failure.channel() + ":" + failure.code() + "("
+                        + (failure.channel() == NotificationChannel.CONSOLE ? "diagnóstico"
+                        : failure.local() ? "local" : "proveedor") + ")")
+                .toList();
+    }
+
+    /**
+     * Causa que lleva {@code lastError} en el cierre: la del último canal de entrega real. La consola es
+     * solo diagnóstico y su código ({@code CONSOLE_DIAGNOSTIC_ONLY}) no explica por qué no se entregó;
+     * solo si no hubo otro canal se informa el suyo.
+     */
+    private static String lastDeliveryError(List<ChannelFailure> failures, String lastReason) {
+        for (int i = failures.size() - 1; i >= 0; i--) {
+            if (failures.get(i).channel() != NotificationChannel.CONSOLE) {
+                return failures.get(i).code();
+            }
+        }
+
+        return lastReason;
     }
 
     private static DispatchFinish finishWithoutAcceptance(boolean fallbackAvailable) {
@@ -830,6 +872,10 @@ public class NotificationDispatcherService {
     private record Prepared(ChannelMessage message, LocalRejection rejection) {
     }
 
+    /** Fallo de un canal en este despacho; {@code local}: nunca llegó al proveedor. */
+    private record ChannelFailure(NotificationChannel channel, String code, boolean local) {
+    }
+
     private record SendOutcome(
             DeliveryOutcome outcome,
             FailureType failureType,
@@ -847,6 +893,7 @@ public class NotificationDispatcherService {
         private final Notification notification;
         private final NotificationSchedule schedule;
         private final List<NotificationAttempt> attempts;
+        private final List<ChannelFailure> failures = new ArrayList<>();
         private int expectedAttemptCount;
         private NotificationAttempt inFlight;
         private boolean providerInvoked;
@@ -880,6 +927,13 @@ public class NotificationDispatcherService {
             return context()
                     .withAttempt(attempt.getId(), attempt.getAttemptNumber())
                     .withChannel(attempt.getChannel(), attempt.getProviderName());
+        }
+
+        /** Contexto de un intento rechazado antes de invocar al proveedor: sin su nombre. */
+        private NotificationLogContext localContext(NotificationAttempt attempt) {
+            return context()
+                    .withAttempt(attempt.getId(), attempt.getAttemptNumber())
+                    .withChannel(attempt.getChannel(), null);
         }
     }
 }

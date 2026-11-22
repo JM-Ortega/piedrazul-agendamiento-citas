@@ -3,10 +3,12 @@ package co.edu.unicauca.piedrazul.backend.appointment.infrastructure.integration
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.AppointmentState;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.DocumentType;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.Gender;
+import co.edu.unicauca.piedrazul.backend.appointment.domain.model.PatientInfo;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.model.SchedulingOrigin;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.DoctorConfigConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.domain.port.output.PatientConsultPort;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.AppointmentRequest;
+import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.api.dto.input.RescheduleAppointmentRequest;
 import co.edu.unicauca.piedrazul.backend.appointment.infrastructure.persistence.AppointmentJpaRepository;
 import co.edu.unicauca.piedrazul.backend.doctors.config.DoctorDataInitializer;
 import co.edu.unicauca.piedrazul.backend.doctors.domain.Doctor;
@@ -43,6 +45,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -199,5 +202,145 @@ class AppointmentControllerIT extends PostgresIntegrationSupport {
                 .andExpect(status().isCreated());
 
         assertThat(appointmentJpaRepository.findByIdDoctorAndDate(doctorId, request.getDate())).hasSize(1);
+    }
+
+    // ---- reagendamiento ----
+
+    /** Agenda (manual, vía HTTP) una cita original para un paciente nuevo y devuelve su id. */
+    private UUID scheduleOriginal(UUID doctorId, LocalDate date) throws Exception {
+        AppointmentRequest request = new AppointmentRequest();
+        request.setDoctorId(doctorId);
+        // Paciente nuevo con especialidad distinta de terapia neural: el flujo manual lo permite
+        request.setSpecialty(SpecialtyCode.FISIOTERAPIA);
+        request.setDate(date);
+        request.setStartTime(LocalTime.of(9, 0));
+        request.setSchedulingOrigin(SchedulingOrigin.MANUAL);
+        request.setDocumentType(DocumentType.CEDULA);
+        request.setDocumentNumber(uniqueDocument());
+        request.setFirstName("Ana");
+        request.setLastName("Ruiz");
+        request.setPhone("3001234567");
+        request.setGender(Gender.FEMENINO);
+        request.setBirthDate(LocalDate.of(1990, 6, 15));
+
+        mockMvc.perform(post("/api/appointments")
+                        .with(jwtWithRole(UUID.randomUUID(), "SCHEDULER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated());
+
+        return appointmentJpaRepository.findByIdDoctorAndDate(doctorId, date).getFirst().getIdAppointment();
+    }
+
+    private String rescheduleBody(UUID doctorId, LocalDate date, LocalTime time) throws Exception {
+        RescheduleAppointmentRequest body = new RescheduleAppointmentRequest();
+        body.setDoctorId(doctorId);
+        body.setSpecialty(SpecialtyCode.QUIROPRAXIA);
+        body.setDate(date);
+        body.setStartTime(time);
+        return objectMapper.writeValueAsString(body);
+    }
+
+    private void stubDoctorAndPatientLookups(UUID... doctorIds) {
+        for (UUID id : doctorIds) {
+            when(doctorConfigConsultPort.getIntervalMinutesByDoctor(id)).thenReturn(30);
+            when(doctorConfigConsultPort.getDoctorName(id)).thenReturn("Dra. Prueba");
+        }
+        when(patientConsultPort.findById(any())).thenReturn(PatientInfo.of(
+                DocumentType.CEDULA, "1002003004", "Ana", "Ruiz", "3001234567",
+                Gender.FEMENINO, LocalDate.of(1990, 6, 15), "ana@correo.com", null));
+    }
+
+    @Test
+    void shouldRescheduleAppointmentAsSchedulerAndReturnBothIds() throws Exception {
+        UUID doctorId = newDoctor();
+        UUID newDoctorId = newDoctor();
+        stubDoctorAndPatientLookups(doctorId, newDoctorId);
+        LocalDate date = LocalDate.now().plusDays(1);
+        UUID originalId = scheduleOriginal(doctorId, date);
+
+        mockMvc.perform(post("/api/appointments/{id}/reschedule", originalId)
+                        .with(jwtWithRole(UUID.randomUUID(), "SCHEDULER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(rescheduleBody(newDoctorId, date, LocalTime.of(10, 0))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.cancelledAppointmentId").value(originalId.toString()))
+                .andExpect(jsonPath("$.appointment.idAppointment").isNotEmpty())
+                .andExpect(jsonPath("$.appointment.appointmentState").value("AGENDADA"))
+                .andExpect(jsonPath("$.appointment.specialty").value("QUIROPRAXIA"));
+
+        assertThat(appointmentJpaRepository.findById(originalId).orElseThrow().getAppointmentState())
+                .isEqualTo(AppointmentState.CANCELADA);
+        assertThat(appointmentJpaRepository.findByIdDoctorAndDate(newDoctorId, date))
+                .singleElement()
+                .satisfies(a -> assertThat(a.getAppointmentState()).isEqualTo(AppointmentState.AGENDADA));
+    }
+
+    @Test
+    void shouldLetADoctorRescheduleTheirOwnAppointment() throws Exception {
+        UUID doctorUserId = UUID.randomUUID();
+        UUID doctorId = newDoctor();
+        stubDoctorAndPatientLookups(doctorId);
+        when(doctorConfigConsultPort.findByUserId(doctorUserId)).thenReturn(Optional.of(doctorId));
+        LocalDate date = LocalDate.now().plusDays(1);
+        UUID originalId = scheduleOriginal(doctorId, date);
+
+        mockMvc.perform(post("/api/appointments/{id}/reschedule", originalId)
+                        .with(jwtWithRole(doctorUserId, "DOCTOR"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(rescheduleBody(doctorId, date, LocalTime.of(11, 0))))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void shouldForbidADoctorFromReschedulingAnotherDoctorsAppointment() throws Exception {
+        UUID doctorUserId = UUID.randomUUID();
+        UUID doctorId = newDoctor();
+        UUID anotherDoctorId = newDoctor();
+        stubDoctorAndPatientLookups(doctorId);
+        when(doctorConfigConsultPort.findByUserId(doctorUserId)).thenReturn(Optional.of(anotherDoctorId));
+        LocalDate date = LocalDate.now().plusDays(1);
+        UUID originalId = scheduleOriginal(doctorId, date);
+
+        mockMvc.perform(post("/api/appointments/{id}/reschedule", originalId)
+                        .with(jwtWithRole(doctorUserId, "DOCTOR"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(rescheduleBody(doctorId, date, LocalTime.of(11, 0))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("APPOINTMENT_ACCESS_DENIED"));
+
+        assertThat(appointmentJpaRepository.findById(originalId).orElseThrow().getAppointmentState())
+                .isEqualTo(AppointmentState.AGENDADA);
+    }
+
+    @Test
+    void shouldForbidAPatientFromRescheduling() throws Exception {
+        mockMvc.perform(post("/api/appointments/{id}/reschedule", UUID.randomUUID())
+                        .with(jwtWithRole(UUID.randomUUID(), "PATIENT"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(rescheduleBody(UUID.randomUUID(), LocalDate.now().plusDays(1), LocalTime.of(10, 0))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldReturnConflictWhenReschedulingAnAlreadyCancelledAppointment() throws Exception {
+        UUID doctorId = newDoctor();
+        stubDoctorAndPatientLookups(doctorId);
+        LocalDate date = LocalDate.now().plusDays(1);
+        UUID originalId = scheduleOriginal(doctorId, date);
+        String body = rescheduleBody(doctorId, date, LocalTime.of(10, 0));
+
+        mockMvc.perform(post("/api/appointments/{id}/reschedule", originalId)
+                        .with(jwtWithRole(UUID.randomUUID(), "SCHEDULER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/appointments/{id}/reschedule", originalId)
+                        .with(jwtWithRole(UUID.randomUUID(), "SCHEDULER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("CANCEL_NOT_ALOWED"));
     }
 }

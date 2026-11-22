@@ -24,6 +24,12 @@ public interface JpaNotificationRepository
             List<NotificationStatus> statuses
     );
 
+    Optional<NotificationEntity> findFirstByAggregateTypeAndAggregateIdAndType(
+            AggregateType aggregateType,
+            UUID aggregateId,
+            NotificationType type
+    );
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT n FROM NotificationEntity n WHERE n.id = :id")
     Optional<NotificationEntity> findByIdForUpdate(@Param("id") UUID id);

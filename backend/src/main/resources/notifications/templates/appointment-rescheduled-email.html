@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cita médica reprogramada</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f5f5f5;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+    <tr>
+      <td align="center" style="padding:24px 12px;">
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+          <tr>
+            <td style="background-color:#215c98;padding:24px 32px;">
+              <p style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">Piedra Azul Salud</p>
+              <p style="margin:4px 0 0;color:#e5eef9;font-size:14px;">Centro Médico</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px 24px;">
+              <p style="margin:0 0 8px;font-size:22px;font-weight:bold;color:#1a1a1a;">Cita reprogramada</p>
+              <p style="margin:0 0 24px;color:#555555;font-size:15px;">Hola {{patientName}}, tu cita médica fue reprogramada. A continuación encontrarás los datos anteriores y los nuevos.</p>
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:16px;background:#f3f3f3;border-radius:6px;border-left:4px solid #767676;">
+                <tr>
+                  <td style="padding:16px 20px;">
+                    <p style="margin:0 0 12px;font-size:13px;color:#555555;text-transform:uppercase;letter-spacing:0.5px;"><strong>Antes</strong></p>
+                    <p style="margin:0 0 8px;font-size:15px;color:#1a1a1a;"><strong>Fecha:</strong> {{previousDate}}</p>
+                    <p style="margin:0 0 8px;font-size:15px;color:#1a1a1a;"><strong>Hora:</strong> {{previousTime}}</p>
+                    <p style="margin:0 0 8px;font-size:15px;color:#1a1a1a;"><strong>Médico:</strong> {{previousDoctorName}}</p>
+                    <p style="margin:0 0 8px;font-size:15px;color:#1a1a1a;"><strong>Especialidad:</strong> {{previousSpecialty}}</p>
+                  </td>
+                </tr>
+              </table>
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:16px;background:#eef4fb;border-radius:6px;border-left:4px solid #215c98;">
+                <tr>
+                  <td style="padding:16px 20px;">
+                    <p style="margin:0 0 12px;font-size:13px;color:#555555;text-transform:uppercase;letter-spacing:0.5px;"><strong>Ahora</strong></p>
+                    <p style="margin:0 0 8px;font-size:15px;color:#1a1a1a;"><strong>Fecha:</strong> {{date}}</p>
+                    <p style="margin:0 0 8px;font-size:15px;color:#1a1a1a;"><strong>Hora:</strong> {{time}}</p>
+                    <p style="margin:0 0 8px;font-size:15px;color:#1a1a1a;"><strong>Médico:</strong> {{doctorName}}</p>
+                    <p style="margin:0 0 8px;font-size:15px;color:#1a1a1a;"><strong>Especialidad:</strong> {{specialty}}</p>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:8px 0 0;font-size:14px;color:#555555;">Si la nueva fecha u hora no te conviene, comunícate con el centro médico para solicitar otro cambio. También puedes cancelar esta cita desde el portal de pacientes y solicitar una nueva, si el agendamiento en línea está disponible. Ten en cuenta que cancelar tu cita no garantiza otro horario.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background:#f9f9f9;padding:16px 32px;border-top:1px solid #eeeeee;">
+              <p style="margin:0;font-size:12px;color:#666666;text-align:center;">Piedra Azul Salud · Centro Médico</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

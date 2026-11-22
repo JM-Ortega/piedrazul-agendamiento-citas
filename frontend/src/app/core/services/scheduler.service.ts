@@ -65,14 +65,18 @@ export class SchedulerService {
    * @param params.state filtra por estado de cita (opcional)
    * @param params.pageNumber número de página a solicitar, base 0 (por defecto 0)
    * @param params.pageSize cantidad de citas por página (por defecto 5)
+   * @param params.dateTo fecha máxima inclusive, formato `YYYY-MM-DD`: solo citas de ese día y anteriores (opcional)
+   * @param params.sortDirection orden por fecha, ascendente o descendente; si se omite, aplica el del backend
    */
   loadAllAppointments(params?: {
     idDoctor?: string;
     idPatient?: string;
     date?: string;
+    dateTo?: string;
     state?: string;
     pageNumber?: number;
     pageSize?: number;
+    sortDirection?: 'asc' | 'desc';
   }): Observable<PageResponse<AppointmentsPatient>> {
     return this.getAllAppointments(params).pipe(
       tap((page) => this.appointmentsState.set(page))
@@ -86,9 +90,11 @@ export class SchedulerService {
     idDoctor?: string;
     idPatient?: string;
     date?: string;
+    dateTo?: string;
     state?: string;
     pageNumber?: number;
     pageSize?: number;
+    sortDirection?: 'asc' | 'desc';
   }): Observable<PageResponse<AppointmentsPatient>> {
     let httpParams = new HttpParams();
     if (params?.idDoctor)
@@ -96,7 +102,13 @@ export class SchedulerService {
     if (params?.idPatient)
       httpParams = httpParams.set('idPatient', params.idPatient);
     if (params?.date) httpParams = httpParams.set('date', params.date);
+    if (params?.dateTo) httpParams = httpParams.set('dateTo', params.dateTo);
     if (params?.state) httpParams = httpParams.set('state', params.state);
+    if (params?.sortDirection)
+      httpParams = httpParams.set(
+        'sortDirection',
+        params.sortDirection.toUpperCase()
+      );
     httpParams = withPagination(
       httpParams,
       params?.pageNumber,

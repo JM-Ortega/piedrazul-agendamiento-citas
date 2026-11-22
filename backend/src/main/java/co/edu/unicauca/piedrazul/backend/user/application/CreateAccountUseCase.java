@@ -160,21 +160,14 @@ public class CreateAccountUseCase implements UserProvisioningApi {
     private void validateRoles(List<Role> roles) {
         Set<Role> roleSet = EnumSet.copyOf(roles);
 
-        Set<Set<Role>> validCombinations = Set.of(
-                Set.of(Role.PATIENT),
-                Set.of(Role.ADMIN),
-                Set.of(Role.DOCTOR),
-                Set.of(Role.SCHEDULER),
-                Set.of(Role.AUDITOR),
-                Set.of(Role.DOCTOR, Role.SCHEDULER),
-                Set.of(Role.DOCTOR, Role.PATIENT),
-                Set.of(Role.DOCTOR, Role.SCHEDULER, Role.PATIENT),
-                Set.of(Role.DOCTOR, Role.SCHEDULER, Role.ADMIN),
-                Set.of(Role.DOCTOR, Role.SCHEDULER, Role.ADMIN, Role.PATIENT)
-        );
+        boolean invalidPatientCombination = roleSet.size() == 2
+                && roleSet.contains(Role.PATIENT)
+                && (roleSet.contains(Role.ADMIN) || roleSet.contains(Role.AUDITOR));
 
-        if (!validCombinations.contains(roleSet)) {
-            throw new InvalidRoleAssignmentException("Combinación de roles no es valida: " + roles);
+        if (invalidPatientCombination) {
+            throw new InvalidRoleAssignmentException(
+                    "PATIENT no puede combinarse únicamente con ADMIN o AUDITOR"
+            );
         }
     }
 }

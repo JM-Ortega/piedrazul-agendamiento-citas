@@ -158,8 +158,8 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
     }
 
     @Override
-    public PagedResult<Appointment> listBy(UUID idDoctor, UUID idPatient, LocalDate date, AppointmentState state, PageQuery pageQuery) {
-        Specification<AppointmentEntity> spec = buildSpecification(idDoctor, idPatient, date, state);
+    public PagedResult<Appointment> listBy(UUID idDoctor, UUID idPatient, LocalDate date, LocalDate dateTo, AppointmentState state, PageQuery pageQuery) {
+        Specification<AppointmentEntity> spec = buildSpecification(idDoctor, idPatient, date, dateTo, state);
 
         Pageable pageable = PageRequest.of(pageQuery.page(), pageQuery.size(), buildDeterministicSort(pageQuery));
 
@@ -183,7 +183,7 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
 
     @Override
     public PagedResult<Appointment> ListDoctorDailyAgenda(UUID idDoctor, LocalDate date, PageQuery pageQuery) {
-        Specification<AppointmentEntity> specification = buildSpecification(idDoctor, null, date, null)
+        Specification<AppointmentEntity> specification = buildSpecification(idDoctor, null, date, null, null)
                 .and(byStatePriority());
 
         Pageable pageable = PageRequest.of(pageQuery.page(), pageQuery.size());
@@ -205,7 +205,7 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
                 .toList();
     }
 
-    private Specification<AppointmentEntity> buildSpecification(UUID idDoctor, UUID idPatient, LocalDate date, AppointmentState state) {
+    private Specification<AppointmentEntity> buildSpecification(UUID idDoctor, UUID idPatient, LocalDate date, LocalDate dateTo, AppointmentState state) {
         List<Specification<AppointmentEntity>> specs = new ArrayList<>();
 
         if (idDoctor != null) {
@@ -216,6 +216,9 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
         }
         if (date != null) {
             specs.add((root, query, cb) -> cb.equal(root.get("date"), date));
+        }
+        if (dateTo != null) {
+            specs.add((root, query, cb) -> cb.lessThanOrEqualTo(root.<LocalDate>get("date"), dateTo));
         }
         if (state != null) {
             specs.add((root, query, cb) -> cb.equal(root.get("appointmentState"), state));

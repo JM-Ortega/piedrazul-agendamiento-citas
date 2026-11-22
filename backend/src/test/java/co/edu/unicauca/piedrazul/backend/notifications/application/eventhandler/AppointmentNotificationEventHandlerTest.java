@@ -1,6 +1,10 @@
 package co.edu.unicauca.piedrazul.backend.notifications.application.eventhandler;
 
+import co.edu.unicauca.piedrazul.backend.appointment.events.AppointmentCancelledByStaffEvent;
+import co.edu.unicauca.piedrazul.backend.appointment.events.AppointmentRescheduledEvent;
 import co.edu.unicauca.piedrazul.backend.appointment.events.AppointmentScheduledEvent;
+import co.edu.unicauca.piedrazul.backend.notifications.api.SendNotificationCommand;
+import java.util.Map;
 import co.edu.unicauca.piedrazul.backend.notifications.NotificationModuleApi;
 import co.edu.unicauca.piedrazul.backend.notifications.api.ScheduleNotificationCommand;
 import co.edu.unicauca.piedrazul.backend.notifications.domain.model.AggregateType;
@@ -70,6 +74,56 @@ class AppointmentNotificationEventHandlerTest {
 
         verify(api, never()).schedule(any());
         verify(api, never()).sendNow(any());
+    }
+
+    @Test
+    void staffCancellationSendsOneEmailNoticeOnTheCancelledAppointmentAndNothingElse() {
+        AppointmentCancelledByStaffEvent cancelled = new AppointmentCancelledByStaffEvent(UUID.randomUUID(),
+                UUID.randomUUID(), "Paciente Sintético", "+570000000000", "sintetico@example.test",
+                "Dra. Sintética", LocalDate.of(2026, 3, 10), LocalTime.of(14, 30), "TERAPIA_NEURAL");
+
+        handlerAt(REMINDER_AT).onAppointmentCancelledByStaff(cancelled);
+
+        ArgumentCaptor<SendNotificationCommand> command = ArgumentCaptor.forClass(SendNotificationCommand.class);
+        verify(api).sendNow(command.capture());
+        verify(api, never()).schedule(any());
+        SendNotificationCommand sent = command.getValue();
+        assertThat(sent.type()).isEqualTo(NotificationType.APPOINTMENT_CANCELLED);
+        assertThat(sent.aggregate().type()).isEqualTo(AggregateType.APPOINTMENT);
+        assertThat(sent.aggregate().id()).isEqualTo(cancelled.appointmentId());
+        assertThat(sent.recipient().email()).isEqualTo("sintetico@example.test");
+        assertThat(sent.recipient().channelPreference().preferredOrder()).isEmpty();
+        assertThat(sent.variables()).containsEntry("patientName", "Paciente Sintético")
+                .containsEntry("doctorName", "Dra. Sintética")
+                .containsEntry("date", "Martes 10 de marzo de 2026")
+                .containsEntry("specialty", "Terapia neural");
+        assertThat(sent.variables().get("time")).startsWith("2:30").endsWith("m.");
+    }
+
+    @Test
+    void reschedulingSendsOneNoticeOnThePreviousAppointmentWithBothSetsOfDetailsAndNoReminderChange() {
+        AppointmentRescheduledEvent rescheduled = new AppointmentRescheduledEvent(UUID.randomUUID(),
+                UUID.randomUUID(), UUID.randomUUID(), "Paciente Sintético", "+570000000000", null,
+                "Dr. Anterior", LocalDate.of(2026, 3, 10), LocalTime.of(8, 0), "FISIOTERAPIA",
+                "Dra. Nueva", LocalDate.of(2026, 3, 12), LocalTime.of(15, 0), "QUIROPRAXIA");
+
+        handlerAt(REMINDER_AT).onAppointmentRescheduled(rescheduled);
+
+        ArgumentCaptor<SendNotificationCommand> command = ArgumentCaptor.forClass(SendNotificationCommand.class);
+        verify(api).sendNow(command.capture());
+        verify(api, never()).schedule(any());
+        SendNotificationCommand sent = command.getValue();
+        assertThat(sent.type()).isEqualTo(NotificationType.APPOINTMENT_RESCHEDULED);
+        assertThat(sent.aggregate().id()).isEqualTo(rescheduled.previousAppointmentId());
+        assertThat(sent.variables()).containsAllEntriesOf(Map.of(
+                "previousDoctorName", "Dr. Anterior",
+                "previousDate", "Martes 10 de marzo de 2026",
+                "previousSpecialty", "Fisioterapia",
+                "doctorName", "Dra. Nueva",
+                "date", "Jueves 12 de marzo de 2026",
+                "specialty", "Quiropraxia"));
+        assertThat(sent.variables().get("previousTime")).startsWith("8:00");
+        assertThat(sent.variables().get("time")).startsWith("3:00");
     }
 
     private AppointmentNotificationEventHandler handlerAt(Instant now) {

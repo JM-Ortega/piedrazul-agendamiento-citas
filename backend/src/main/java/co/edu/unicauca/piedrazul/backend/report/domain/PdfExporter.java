@@ -159,13 +159,13 @@ public class PdfExporter {
             tabla.setSpacingBefore(4);
 
             // Encabezados — nombres de médicos
-            Font fuenteHeader = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9, COLOR_WHITE);
+            Font fuenteHeader = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 13, COLOR_WHITE);
             for (DoctorDailyScheduleDto schedule : schedules) {
                 PdfPCell celda = new PdfPCell(new Phrase(schedule.doctorName(), fuenteHeader));
                 celda.setBackgroundColor(COLOR_HEADER_BG);
                 celda.setHorizontalAlignment(Element.ALIGN_CENTER);
                 celda.setVerticalAlignment(Element.ALIGN_MIDDLE);
-                celda.setPadding(6);
+                celda.setPadding(8);
                 celda.setBorderColor(COLOR_BORDER);
                 tabla.addCell(celda);
             }

@@ -9,7 +9,6 @@ import { Router } from '@angular/router';
 import {
   LucideLogIn,
   LucideMessageCircle,
-  LucidePhone,
   LucideUserPlus,
 } from '@lucide/angular';
 import Keycloak from 'keycloak-js';
@@ -19,13 +18,7 @@ import { ButtonComponent } from '../../atoms/button/button.component';
 @Component({
   selector: 'app-appointment-modal',
   standalone: true,
-  imports: [
-    LucideLogIn,
-    LucideUserPlus,
-    LucideMessageCircle,
-    LucidePhone,
-    ButtonComponent,
-  ],
+  imports: [LucideLogIn, LucideUserPlus, LucideMessageCircle, ButtonComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './appointmentModal.component.html',
 })

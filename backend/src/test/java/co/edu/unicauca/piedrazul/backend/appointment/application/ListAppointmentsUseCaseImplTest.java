@@ -36,12 +36,13 @@ class ListAppointmentsUseCaseImplTest {
         UUID idDoctor = UUID.randomUUID();
         UUID idPatient = UUID.randomUUID();
         LocalDate date = LocalDate.now().plusDays(1);
+        LocalDate dateTo = date.plusDays(3);
         PageQuery pageQuery = new PageQuery(0, 10, "date", true);
         PagedResult<Appointment> expected = new PagedResult<>(List.of(), 0, 10, 0, 0);
-        when(appointmentRepository.listBy(idDoctor, idPatient, date, AppointmentState.AGENDADA, pageQuery))
+        when(appointmentRepository.listBy(idDoctor, idPatient, date, dateTo, AppointmentState.AGENDADA, pageQuery))
                 .thenReturn(expected);
 
-        PagedResult<Appointment> result = useCase.listBy(idDoctor, idPatient, date, AppointmentState.AGENDADA,
+        PagedResult<Appointment> result = useCase.listBy(idDoctor, idPatient, date, dateTo, AppointmentState.AGENDADA,
                 pageQuery);
 
         assertThat(result).isEqualTo(expected);

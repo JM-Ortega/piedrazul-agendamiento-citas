@@ -181,7 +181,7 @@ kc_db_schema: keycloak
 # Notificaciones. La decisión de usar SES y sus credenciales vienen del GitHub Environment,
 # no de aquí (roles/app/tasks/ses_inputs.yml); el remitente se aplica solo con SES habilitado.
 notifications_email_from: no-reply@mail.piedrazul.org
-notifications_email_from_name: Piedrazul Salud
+notifications_email_from_name: Piedra Azul Salud
 # Endpoint SMTP público de SES: estándar o FIPS, en amazonaws.com o api.aws. Misma expresión que
 # .github/scripts/ses-config.sh; la región y la conectividad no se comprueban aquí.
 ses_smtp_host_pattern: '^email-smtp(-fips)?\.[a-z]{2}(-[a-z]+)+-[0-9]+\.(amazonaws\.com|api\.aws)\Z'
