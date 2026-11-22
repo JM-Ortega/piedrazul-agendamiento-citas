@@ -144,6 +144,9 @@ export class RegisterComponent implements OnInit {
   confirmPassword = signal('');
   verificationCode = signal('');
 
+  /** Aceptación de la política de tratamiento de datos. Solo controla el envío; no se manda al backend. */
+  acceptedPolicy = signal(false);
+
   protected readonly PASSWORD_MIN = 6;
   protected readonly PASSWORD_MAX = 100;
   private readonly PASSWORD_ALPHANUMERIC = /^(?=.*[a-zA-Z])(?=.*[0-9]).+$/;
@@ -248,6 +251,17 @@ export class RegisterComponent implements OnInit {
     this.verificationCode.set(String(value ?? ''));
   }
 
+  onAcceptedPolicyChange(value: string | number | boolean | null): void {
+    this.acceptedPolicy.set(value === true);
+    if (this.acceptedPolicy()) {
+      this.errors.update((e) => {
+        const next = { ...e };
+        delete next['acceptedPolicy'];
+        return next;
+      });
+    }
+  }
+
   searchPatient(): void {
     this.patientStatus.set('idle');
     this.foundPatient.set(null);
@@ -344,6 +358,7 @@ export class RegisterComponent implements OnInit {
     this.password.set('');
     this.confirmPassword.set('');
     this.verificationCode.set('');
+    this.acceptedPolicy.set(false);
     this.resetForm();
   }
 
@@ -519,6 +534,11 @@ export class RegisterComponent implements OnInit {
       if (this.password() !== this.confirmPassword()) {
         newErrors['confirmPassword'] = 'Las contraseñas no coinciden';
       }
+    }
+
+    if (!this.acceptedPolicy()) {
+      newErrors['acceptedPolicy'] =
+        'Debes aceptar la política de tratamiento de datos';
     }
 
     this.errors.set(newErrors);
