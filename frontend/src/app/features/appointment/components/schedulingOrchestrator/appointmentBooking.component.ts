@@ -23,6 +23,9 @@ import { NuevaCitaService } from '../../services/nuevaCita.service';
 import { BookingConfirmComponent } from '../confirmAppointment/bookingConfirm.component';
 import { AppError } from '../../../../shared/models/interfaces/apiError.model';
 
+const NO_AVAILABILITY_MESSAGE =
+  'No hay espacio disponible para agendar. Intente nuevamente otro día.';
+
 /**
  * Coordina el flujo de agendamiento componiendo los
  * componentes hermanos en el orden correcto según el contexto y step actual.
@@ -248,7 +251,12 @@ export class AppointmentBookingComponent implements OnInit {
       .getSpecialtiesWithActiveDoctors(patientId, this.state.schedulingOrigin())
       .subscribe({
         next: (docs) => {
-          this.state.doctors.set(docs);
+          this.state.doctors.set(docs ?? []);
+          if (!docs?.length) {
+            this.state.noDoctorsFound.set(true);
+            this.state.errorMessageDoctors.set(NO_AVAILABILITY_MESSAGE);
+            return;
+          }
           if (this.shouldApplyDoctorPrefill) {
             this.applyDoctorPrefill(docs);
           }
