@@ -1,0 +1,137 @@
+# ── Proyecto
+PROJECT_NAME=piedrazul
+
+GITHUB_OWNER=jm-ortega
+GITHUB_REPO=piedrazul-agendamiento-citas
+POSTGRES_IMAGE_TAG=none
+
+# ── Spring / backend
+SPRING_PROFILES_ACTIVE=dev
+SERVER_PORT=8080
+SERVER_FORWARD_HEADERS_STRATEGY=framework
+
+# ── PostgreSQL bootstrap (rol superusuario inicial del contenedor)
+# Usado únicamente por 01-init-databases.sh en la primera inicialización.
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=piedrazul_db
+
+# ── Base de datos: rol de aplicación (Spring Boot en ejecución normal)
+# Sin permisos de CREATE. Ver bootstrap: solo USAGE sobre los schemas.
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=piedrazul_db
+DB_SCHEMA=piedrazul
+
+APP_DB_USERNAME=piedrazul_app
+APP_DB_PASSWORD=piedrazul_app
+
+# ── Base de datos: rol de migraciones (Flyway)
+# Con permisos de CREATE sobre piedrazul y extensions. Ver bootstrap.
+MIGRATION_DB_USERNAME=piedrazul_migration
+MIGRATION_DB_PASSWORD=piedrazul_migration
+
+# ── JPA / Hibernate
+# validate en vez de update: Flyway gestiona el schema, Hibernate solo
+# verifica que las entidades coincidan con lo que Flyway ya creó.
+JPA_DDL_AUTO=validate
+JPA_SHOW_SQL=false
+JPA_FORMAT_SQL=false
+
+# ── Keycloak DB (rol exclusivo del schema keycloak, ver bootstrap)
+KC_DB_USERNAME=keycloak_user
+KC_DB_PASSWORD=keycloak_pass
+KC_DB_SCHEMA=keycloak
+
+# ── Keycloak bootstrap (solo desarrollo: admin de la consola local, ver docker-compose.yml).
+# Producción no usa KC_BOOTSTRAP_ADMIN_* (ver infra/ansible/ANSIBLE.md, ciclo técnico de Keycloak).
+KC_BOOTSTRAP_ADMIN_USERNAME=admin
+KC_BOOTSTRAP_ADMIN_PASSWORD=admin
+
+# ── Keycloak config
+KC_PORT=8180
+KC_REALM=piedrazul
+KC_SERVER_URL=http://localhost:8180
+KC_ISSUER_URI=http://localhost:8180/realms/piedrazul
+KC_HEALTH_ENABLED=true
+KC_METRICS_ENABLED=true
+
+# ── Keycloak cliente backend
+# Valor de desarrollo: el servicio keycloak-dev-secret de docker-compose.yml lo aplica al
+# realm local. Producción rechaza cualquier valor de este archivo.
+KC_BACKEND_CLIENT_ID=piedrazul-backend
+KC_BACKEND_CLIENT_SECRET=28cxKvXW2kUGZy3Qju2CsQCLEvJtYzPh
+
+# ── Frontend / CORS
+# Dirección pública del frontend Angular. La consume el tema de login de Keycloak en ejecución
+# (compose/keycloak.yml): enlaces "Volver al inicio" y de registro de pacientes (/registro).
+FRONTEND_PUBLIC_URL=http://localhost:4200
+CORS_ALLOWED_ORIGINS=http://localhost:4200
+
+# ── Manejo de errores
+ERROR_INCLUDE_STACKTRACE=never
+ERROR_INCLUDE_MESSAGE=always
+
+# ── Uploads
+MAX_FILE_SIZE=10MB
+MAX_REQUEST_SIZE=10MB
+
+# ── App
+APP_TIMEZONE=America/Bogota
+
+# ── Actuator
+MANAGEMENT_EXPOSED_ENDPOINTS=health,info
+MANAGEMENT_HEALTH_DETAILS=always
+
+# ── Logging
+LOG_LEVEL_ROOT=INFO
+LOG_LEVEL_SECURITY=INFO
+LOG_LEVEL_SQL=WARN
+LOG_LEVEL_SQL_BIND=WARN
+LOG_LEVEL_MODULITH=WARN
+
+# ── Datos de demostración (solo desarrollo)
+# Médicos, pacientes, agendadores y auditor ficticios. Además de este opt-in exigen
+# SPRING_PROFILES_ACTIVE=dev exclusivo: con prod, sin perfil o con otro perfil no corren.
+# Los médicos de demostración traen ADMIN: en desarrollo sirven como administradores.
+APP_DEMO_SEED_ENABLED=true
+
+# ── Bootstrap del primer administrador de negocio (create-only)
+# Deshabilitado por defecto: no usa ninguna de estas variables. Para probarlo en local,
+# habilítelo sobre una base y un realm limpios (sin otra cuenta ADMIN: con los datos de
+# demostración ya creados el resultado es CONFLICT existing_admin_authority) y ponga una
+# contraseña temporal propia de al menos 16 caracteres; el primer login exige cambiarla.
+# Ver docs/operations/runbooks/primer-admin-negocio.md.
+IDENTITY_SEED_ENABLED=false
+IDENTITY_SEED_ADMIN_USERNAME=44000001
+IDENTITY_SEED_ADMIN_IDENTIFICATION_TYPE=CEDULA
+IDENTITY_SEED_ADMIN_FIRST_NAME=Administracion
+IDENTITY_SEED_ADMIN_LAST_NAME=Demo
+IDENTITY_SEED_ADMIN_EMAIL=admin@demo.piedrazul.test
+IDENTITY_SEED_ADMIN_PHONE=3000000001
+IDENTITY_SEED_ADMIN_PASSWORD=
+
+# ── Notifications
+NOTIFICATION_ENCRYPTION_KEY=RuNmbIc1vEeXfggnl5wbupW0zQk/VjhJuOSY2NRhp6c=
+NOTIFICATIONS_CONSOLE_SHOW_SENSITIVE=false
+NOTIFICATIONS_DUE_JOB_FIXED_DELAY=30000
+NOTIFICATIONS_STALE_ATTEMPT_ENABLED=true
+NOTIFICATIONS_STALE_ATTEMPT_FIXED_DELAY=300000
+NOTIFICATIONS_STALE_EMAIL_THRESHOLD=6h
+NOTIFICATIONS_STALE_SMS_THRESHOLD=30m
+NOTIFICATIONS_STALE_WHATSAPP_THRESHOLD=30m
+NOTIFICATIONS_STALE_DEFAULT_THRESHOLD=2h
+MODULITH_SCHEMA_INIT=true
+
+# ── SendGrid
+NOTIFICATIONS_SENDGRID_ENABLED=false
+SENDGRID_API_KEY=none
+NOTIFICATIONS_EMAIL_FROM=no-reply@mail.piedrazul.org
+NOTIFICATIONS_EMAIL_FROM_NAME=Piedrazul Salud
+SENDGRID_SANDBOX_MODE=false
+
+# ── Resilience4j
+RESILIENCE4J_SENDGRID_WINDOW_SIZE=10
+RESILIENCE4J_SENDGRID_FAILURE_RATE=50
+RESILIENCE4J_SENDGRID_WAIT_DURATION=30s
+RESILIENCE4J_SENDGRID_HALF_OPEN_CALLS=3

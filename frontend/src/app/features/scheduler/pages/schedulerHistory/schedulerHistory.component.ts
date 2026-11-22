@@ -60,8 +60,6 @@ const PAGE_SIZE = 5;
 export class SchedulerHistoryComponent implements OnInit {
   private schedulerService = inject(SchedulerService);
   private patientAppointmentService = inject(PatientAppointmentService);
-  private schedulerService = inject(SchedulerService);
-  private patientAppointmentService = inject(PatientAppointmentService);
   private doctorService = inject(DoctorService);
   private router = inject(Router);
 
@@ -182,7 +180,8 @@ export class SchedulerHistoryComponent implements OnInit {
     this.patient.set(null);
     this.doctorService.getPatientById(patientId).subscribe({
       next: (patient) => {
-        if (this.selectedPatient()?.id === patient.id) this.patient.set(patient);
+        if (this.selectedPatient()?.id === patient.id)
+          this.patient.set(patient);
       },
       error: (err: AppError) =>
         this.showToast(
