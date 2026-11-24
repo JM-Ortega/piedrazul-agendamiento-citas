@@ -8,6 +8,12 @@ Alloy lee ese journal y envía solo las fuentes admitidas a Loki, y Grafana las 
 dashboard **Logs**. Forma parte del proyecto Compose `piedrazul-obs` (ver
 [Métricas](metricas.md)); la aplicación no lo necesita para arrancar ni para quedar healthy.
 
+**Estado en producción (observado 2026-11-22, no una garantía continua).** Hay entradas reales en
+Loki de backend, Keycloak y PostgreSQL. Las de backend y Keycloak se contrastaron con los metadatos
+del journal del host (hora e identidad del contenedor). De **Traefik** no se encontraron eventos en
+esa inspección: estar configurado como fuente no equivale a haber emitido y entregado entradas. La
+retención no se ha observado en producción.
+
 La entrega es de **mejor esfuerzo**: una línea puede faltar o repetirse (ver
 [Pérdida, duplicación y retención](#pérdida-duplicación-y-retención)). Loki no tiene acceso
 público ni puerto en el host.

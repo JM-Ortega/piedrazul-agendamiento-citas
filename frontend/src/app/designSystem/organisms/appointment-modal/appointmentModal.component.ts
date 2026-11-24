@@ -28,10 +28,11 @@ export class AppointmentModalComponent {
   private keycloak = inject(Keycloak);
   private router = inject(Router);
 
-  readonly whatsappUrl = `https://wa.me/${environment.contact.whatsapp}`;
+  // wa.me exige el número en formato internacional (57 = Colombia).
+  readonly whatsappUrl = `https://wa.me/57${environment.contact.whatsapp}`;
+  readonly phoneWhatsappUrl = `https://wa.me/57${environment.contact.phone}`;
   readonly whatsappDisplay = environment.contact.whatsappDisplay;
 
-  readonly phoneUrl = `tel:${environment.contact.phone}`;
   readonly phoneDisplay = environment.contact.phoneDisplay;
 
   login(): void {
