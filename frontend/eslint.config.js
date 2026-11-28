@@ -43,4 +43,10 @@ module.exports = defineConfig([
     rules: {},
   },
   prettierRecommended,
+  {
+    files: ['src/index.html'],
+    rules: {
+      'prettier/prettier': ['error', { parser: 'html' }],
+    },
+  },
 ]);
